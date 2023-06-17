@@ -22,8 +22,29 @@ fn test_no_deps_ignores_path_deps_in_workspaces() {
         .arg("clean")
         .args(["-p", "subcrate"])
         .args(["-p", "path_dep"])
+        .args(["-p", "pass-no-mod-with-dep-in-subdir"])
+        .args(["-p", "pass-mod-with-dep-in-subdir"])
         .output()
         .unwrap();
+
+    // [#8887](https://github.com/rust-lang/rust-clippy/issues/8887)
+    // `mod.rs` checks should not be applied to crate dependencies
+    // located in the subdirectory of workspace
+    let output = Command::new(&*CARGO_CLIPPY_PATH)
+        .current_dir(&cwd)
+        .env("CARGO_INCREMENTAL", "0")
+        .env("CARGO_TARGET_DIR", &target_dir)
+        .arg("clippy")
+        .args(["-p", "pass-no-mod-with-dep-in-subdir"])
+        .args(["-p", "pass-mod-with-dep-in-subdir"])
+        .arg("--")
+        .arg("-Cdebuginfo=0") // disable debuginfo to generate less data in the target dir
+        .output()
+        .unwrap();
+    println!("status: {}", output.status);
+    println!("stdout: {}", String::from_utf8_lossy(&output.stdout));
+    println!("stderr: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(output.status.success());
 
     // `path_dep` is a path dependency of `subcrate` that would trigger a denied lint.
     // Make sure that with the `--no-deps` argument Clippy does not run on `path_dep`.
